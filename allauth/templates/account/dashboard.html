@@ -5,8 +5,8 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title></title>
-    <link rel="stylesheet" href={% static 'allauth/dashboard/css/bootstrap.css' %}>
-    <link rel="stylesheet" href={% static 'allauth/dashboard/css/dashboard.css' %}>
+    <link rel="stylesheet" href={% static 'dashboard/css/bootstrap.css' %}>
+    <link rel="stylesheet" href={% static 'dashboard/css/dashboard.css' %}>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"><!--Google material design icons library-->
     <style>
         .document-options{
@@ -43,7 +43,7 @@
                     <!--image size is restricted to 30X30 which has to be changed using photoshop
                     as image is not looking sharp right now-->
 
-                    <img src={% static 'allauth/dashboard/img/typeset-logo.png' %} width="30px" height="30px">
+                    <img src={% static 'dashboard/img/typeset-logo.png' %} width="30px" height="30px">
                 </a>
             </div>
         </div>
@@ -56,7 +56,7 @@
 
                         <img src={{request.user.socialaccount_set.all.0.get_avatar_url}} width="30px" height="30px">                       
                         
-                        <!-- <img src={% static 'allauth/dashboard/img/typeset-logo.png' %} class="img-circle img-responsive" alt="profile picture" width="30px" height="30px"> -->
+                        <!-- <img src={% static 'dashboard/img/typeset-logo.png' %} class="img-circle img-responsive" alt="profile picture" width="30px" height="30px"> -->
                     </a>
                     <ul class="dropdown-menu" role="menu">
                         <li><a href={% url 'profiles_edit_profile' %}>Profile</a></li>
@@ -107,7 +107,7 @@
                                     <div class="row">
                                         <div>
                                             <figure class="templateThumbnail">
-                                                <img src={% static 'allauth/dashboard/img/document-icon.png' %} class="img-thumbnail"
+                                                <img src={% static 'dashboard/img/document-icon.png' %} class="img-thumbnail"
                                                  alt="document thumbnail" width="64" height="64">
                                                 <figcaption>IEEE</figcaption>
                                                 <span style="display: none" class="tempName">IEEE</span>
@@ -115,7 +115,7 @@
                                                 <span style="display:none" class="tempID">25</span>
                                             </figure>
                                             <figure class="templateThumbnail">
-                                                <img src={% static 'allauth/dashboard/img/document-icon.png' %} class="img-thumbnail"
+                                                <img src={% static 'dashboard/img/document-icon.png' %} class="img-thumbnail"
                                                  alt="document thumbnail" width="64" height="64">
                                                 <figcaption>ACM</figcaption>                                               
                                                 <span style="display: none" class="tempName">ACM</span>
@@ -123,7 +123,7 @@
                                                 <span style="display:none;" class="tempID">2</span>
                                             </figure>
                                             <figure class="templateThumbnail">
-                                                <img src={% static 'allauth/dashboard/img/document-icon.png' %} class="img-thumbnail"
+                                                <img src={% static 'dashboard/img/document-icon.png' %} class="img-thumbnail"
                                                  alt="document thumbnail" width="64" height="64">
                                                 <figcaption>Springler</figcaption>
                                                 <span style="display: none;" class="tempName">Springler</span>
@@ -266,9 +266,9 @@
         </div>
     </div>
 </div>
-<script src={% static 'allauth/dashboard/js/jquery-2.1.4.js' %}></script>
-<script src={% static 'allauth/dashboard/js/bootstrap.js' %}></script>
-<script src={% static 'allauth/dashboard/js/dashboard.js' %}></script>
+<script src={% static 'dashboard/js/jquery-2.1.4.js' %}></script>
+<script src={% static 'dashboard/js/bootstrap.js' %}></script>
+<script src={% static 'dashboard/js/dashboard.js' %}></script>
 <script>
     $(document).ready(function(){
         /*This function is called When user clicks on a particular template. This template is present in modal which
