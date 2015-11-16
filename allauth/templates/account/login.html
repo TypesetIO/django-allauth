@@ -42,17 +42,7 @@ for a {{ site_name }} account and sign in below:{% endblocktrans %}</p>
                 </div>
                 <div class="panel-body">
 
-                        <form role="form" class="login" method="POST" action="{% url 'account_login' %}">
-                            {% csrf_token %}
-
-                            <fieldset>
-                                {% include "account/form_field.html" %}
-                                
-                        <button class="btn btn-lg btn-success btn-block" type="submit">Sign in</button>
-                            </fieldset>
-                        </form>
-
-<!--                   <form class="login" method="POST" action="{% url 'account_login' %}">
+                  <form class="login" method="POST" action="{% url 'account_login' %}">
                     {% csrf_token %}
 
                       {{ form.as_p }}
@@ -62,7 +52,7 @@ for a {{ site_name }} account and sign in below:{% endblocktrans %}</p>
                     {% endif %}
                     <a class="button secondaryAction" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
                     <button class="btn btn-lg btn-success btn-block" type="submit">{% trans "Sign In" %}</button>
-                  </form> -->
+                  </form>
 
                   </div>
               </div>
