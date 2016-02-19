@@ -23,10 +23,12 @@ class CustomUserManager(BaseUserManager):
         """Create and save a User with the given email and password"""
 
         now = timezone.now()
+        user_id = uuid_function()
+
         if not email:
             raise ValueError('The given email must be set')
         email = self.normalize_email(email)
-        user = self.model(email=email, user_id=uuid_function(),
+        user = self.model(email=email, user_id=user_id,
                           is_staff=is_staff, is_active=True,
                           is_superuser=is_superuser, last_login=now,
                           date_joined=now, **extra_fields)
@@ -90,3 +92,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         """Send an email to this User."""
 
         send_mail(subject, message, from_email, [self.email])
+
+    def set_random_id(self):
+        return uuid_function()

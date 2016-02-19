@@ -211,6 +211,7 @@ class DefaultAccountAdapter(object):
         if commit:
             # Ability not to commit makes it easier to derive from
             # this adapter by adding
+            user.user_id = user.set_random_id()
             user.save()
         return user
 
