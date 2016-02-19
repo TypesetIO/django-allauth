@@ -7,13 +7,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('allauth', '0001_initial'),
+        ('allauth', '0002_customuser_user_id'),
     ]
 
     operations = [
-        migrations.AddField(
+        migrations.AlterField(
             model_name='customuser',
             name='user_id',
-            field=models.CharField(max_length=254, null=True, verbose_name='user_id'),
+            field=models.CharField(unique=True, max_length=254, verbose_name='user_id'),
         ),
     ]
