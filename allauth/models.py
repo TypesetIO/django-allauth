@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import uuid
+
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.contrib.auth.models import BaseUserManager
 from django.core.mail import send_mail
@@ -9,17 +11,22 @@ from django.utils.http import urlquote
 from django.utils.translation import ugettext_lazy as _
 
 
+# Utility function
+def uuid_function():
+    return unicode(uuid.uuid4())[0:9]
+
+
 class CustomUserManager(BaseUserManager):
 
     def _create_user(self, email, password,
                      is_staff, is_superuser, **extra_fields):
-        """ Creates and saves a User with the given email and password """
-        
+        """Create and save a User with the given email and password"""
+
         now = timezone.now()
         if not email:
             raise ValueError('The given email must be set')
         email = self.normalize_email(email)
-        user = self.model(email=email,
+        user = self.model(email=email, user_id=uuid_function(),
                           is_staff=is_staff, is_active=True,
                           is_superuser=is_superuser, last_login=now,
                           date_joined=now, **extra_fields)
@@ -45,6 +52,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     """
 
     email = models.EmailField(_('email address'), max_length=254, unique=True)
+    user_id = models.CharField(_('user_id'), max_length=254, unique=True)
     first_name = models.CharField(_('first name'), max_length=50, blank=True)
     last_name = models.CharField(_('last name'), max_length=50, blank=True)
     is_staff = models.BooleanField(_('staff status'), default=False,
@@ -68,19 +76,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         return "/users/%s/" % urlquote(self.email)
 
     def get_full_name(self):
-        """
-        Returns the first_name plus the last_name, with a space in between.
-        """
+        """Return the first_name plus the last_name, with a space in between."""
+
         full_name = '%s %s' % (self.first_name, self.last_name)
         return full_name.strip()
 
     def get_short_name(self):
-        "Returns the short name for the user."
+        """Return the short name for the user"""
+
         return self.first_name
 
     def email_user(self, subject, message, from_email=None):
-        """
-        Sends an email to this User.
-        """
-        send_mail(subject, message, from_email, [self.email])
+        """Send an email to this User."""
 
+        send_mail(subject, message, from_email, [self.email])
