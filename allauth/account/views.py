@@ -10,6 +10,10 @@ from django.shortcuts import redirect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.utils.decorators import method_decorator
 
+# extra added by Shanu
+from django.core.exceptions import ObjectDoesNotExist
+from invitations.models import Invitation
+
 from ..exceptions import ImmediateHttpResponse
 from ..utils import get_form_class, get_request_param, get_current_site
 
@@ -184,12 +188,36 @@ class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
         return ret
 
     def form_valid(self, form):
+
+        # Get the invite key, if available. Set accepted=True in the invitation model
+        # corresponding to that particular invite key.
+        invite_key = self.request.session.get('invite_key', None)
+        if invite_key:
+            try:
+                invitation_obj = Invitation.objects.get(invite_key=invite_key)
+                invitation_obj.accepted = True
+                invitation_obj.save()
+            except ObjectDoesNotExist:
+                # the invitation key is wrong. Do nothing.
+                pass
+            finally:
+                # return back to the normal state where there is no value associated with
+                # invite_key
+                self.request.session['invite_key'] = None
+
         user = form.save(self.request)
         return complete_signup(self.request, user,
                                app_settings.EMAIL_VERIFICATION,
                                self.get_success_url())
 
     def get_context_data(self, **kwargs):
+
+        # Before getting the context data, we need to set some values in session object so
+        # that it can be used in the next post request
+        invite_key = self.request.GET.get('invite_key', None)
+        if invite_key:
+            self.request.session['invite_key'] = invite_key
+
         ret = super(SignupView, self).get_context_data(**kwargs)
         form = ret['form']
         form.fields["email"].initial = self.request.session \
