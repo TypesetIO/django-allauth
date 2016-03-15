@@ -63,6 +63,11 @@ class RedirectAuthenticatedUserMixin(object):
         # (end WORKAROUND)
         if request.user.is_authenticated() and \
                 app_settings.AUTHENTICATED_LOGIN_REDIRECTS:
+
+            # Invitation:
+            # Check if this is an invitation from another user
+            self.invitation_check()
+
             redirect_to = self.get_authenticated_redirect_url()
             response = HttpResponseRedirect(redirect_to)
             return _ajax_response(request, response)
@@ -78,6 +83,30 @@ class RedirectAuthenticatedUserMixin(object):
         return get_login_redirect_url(self.request,
                                       url=self.get_success_url(),
                                       redirect_field_name=redirect_field_name)
+
+    def invitation_check(self):
+        """
+        The method does actions in the Invitation model, if the invitation_key
+        exists
+        """
+        # Invitation:
+        # Get the invite key, if available or set it.
+        invite_key = self.request.session.get('invite_key', None)
+
+        if invite_key:
+            try:
+                # set accepted=True to show that the invitation has been received.
+                invitation_obj = Invitation.objects.get(invite_key=invite_key)
+                invitation_obj.accepted = True
+                invitation_obj.save()
+
+            except ObjectDoesNotExist:
+                # the invitation key is wrong. Do nothing.
+                pass
+
+            finally:
+                # Drop the invite_key from 'session' object
+                self.request.session.pop('invite_key', None)
 
 
 class AjaxCapableProcessFormViewMixin(object):
@@ -175,6 +204,14 @@ class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
 
     @sensitive_post_parameters_m
     def dispatch(self, request, *args, **kwargs):
+
+        # Invitation:
+        # This is called everytime whether the user is logged in or not. For invitation purpose,
+        # whatever session objects we need to set, we will be setting here.
+        invite_key = self.request.GET.get('invite_key', None)
+        if invite_key:
+            self.request.session['invite_key'] = invite_key
+
         return super(SignupView, self).dispatch(request, *args, **kwargs)
 
     def get_form_class(self):
@@ -189,21 +226,9 @@ class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
 
     def form_valid(self, form):
 
-        # Get the invite key, if available. Set accepted=True in the invitation model
-        # corresponding to that particular invite key.
-        invite_key = self.request.session.get('invite_key', None)
-        if invite_key:
-            try:
-                invitation_obj = Invitation.objects.get(invite_key=invite_key)
-                invitation_obj.accepted = True
-                invitation_obj.save()
-            except ObjectDoesNotExist:
-                # the invitation key is wrong. Do nothing.
-                pass
-            finally:
-                # return back to the normal state where there is no value associated with
-                # invite_key
-                self.request.session['invite_key'] = None
+        # Invitation:
+        # check whether it's an invitation from another user
+        self.invitation_check()
 
         user = form.save(self.request)
         return complete_signup(self.request, user,
@@ -212,22 +237,18 @@ class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
 
     def get_context_data(self, **kwargs):
 
-        # Before getting the context data, we need to set some values in session object so
-        # that it can be used in the next post request
-        invite_key = self.request.GET.get('invite_key', None)
-        if invite_key:
-            self.request.session['invite_key'] = invite_key
-
         ret = super(SignupView, self).get_context_data(**kwargs)
         form = ret['form']
         form.fields["email"].initial = self.request.session \
             .get('account_verified_email', None)
+
         login_url = passthrough_next_redirect_url(self.request,
                                                   reverse("account_login"),
                                                   self.redirect_field_name)
         redirect_field_name = self.redirect_field_name
         redirect_field_value = get_request_param(self.request,
                                                  redirect_field_name)
+
         ret.update({"login_url": login_url,
                     "redirect_field_name": redirect_field_name,
                     "redirect_field_value": redirect_field_value})
