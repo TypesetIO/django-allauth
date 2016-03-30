@@ -55,7 +55,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(_('email address'), max_length=254, unique=True)
     user_id = models.CharField(_('user_id'), max_length=254, unique=True)
-    first_name = models.CharField(_('first name'), max_length=50, blank=True)
+    first_name = models.CharField(_('first name'), max_length=50)
     last_name = models.CharField(_('last name'), max_length=50, blank=True)
     is_staff = models.BooleanField(_('staff status'), default=False,
         help_text=_('Designates whether the user can log into this admin '
