@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import uuid
-
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.contrib.auth.models import BaseUserManager
 from django.core.mail import send_mail
@@ -10,10 +8,13 @@ from django.utils import timezone
 from django.utils.http import urlquote
 from django.utils.translation import ugettext_lazy as _
 
+from utilities.toolkit.funcs import get_random_id
 
-# Utility function
-def uuid_function():
-    return unicode(uuid.uuid4())[0:9]
+
+def get_user_id():
+
+    length = 27
+    return get_random_id(length)
 
 
 class CustomUserManager(BaseUserManager):
@@ -23,7 +24,7 @@ class CustomUserManager(BaseUserManager):
         """Create and save a User with the given email and password"""
 
         now = timezone.now()
-        user_id = uuid_function()
+        user_id = get_user_id()
 
         if not email:
             raise ValueError('The given email must be set')
@@ -94,4 +95,4 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         send_mail(subject, message, from_email, [self.email])
 
     def set_random_id(self):
-        return uuid_function()
+        return get_user_id()
