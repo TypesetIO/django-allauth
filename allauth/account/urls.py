@@ -1,5 +1,4 @@
 from django.conf.urls import url
-from django.views.generic import RedirectView
 
 from . import views
 
@@ -18,7 +17,7 @@ urlpatterns = [
     url(r"^email/$", views.email, name="account_email"),
     url(r"^confirm-email/$", views.email_verification_sent,
         name="account_email_verification_sent"),
-    url(r"^confirm-email/(?P<key>\w+)/$", views.confirm_email,
+    url(r"^confirm-email/(?P<key>[-:\w]+)/$", views.confirm_email,
         name="account_confirm_email"),
 
     # password reset

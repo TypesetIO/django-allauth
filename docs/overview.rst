@@ -4,7 +4,7 @@ Overview
 Requirements
 ------------
 
-- Python 2.6, 2.7 or 3.3
+- Python 2.7, 3.2, 3.3, 3.4, or 3.5
 
 - Django (1.4.3+)
 
@@ -37,9 +37,13 @@ Supported Providers
 
 - AngelList (OAuth2)
 
+- Asana (OAuth2)
+
 - Basecamp (OAuth2)
 
 - Baidu (OAuth2)
+
+- Battle.net (OAuth2)
 
 - Bitbucket (OAuth, OAuth2)
 
@@ -50,6 +54,8 @@ Supported Providers
 - Dropbox (OAuth, OAuth2)
 
 - Edmodo (OAuth2)
+
+- Eve Online (OAuth2)
 
 - Evernote (OAuth)
 
@@ -89,6 +95,8 @@ Supported Providers
 
 - Reddit (OAuth2)
 
+- Shopify (OAuth2)
+
 - SoundCloud (OAuth2)
 
 - Spotify (OAuth2)
@@ -110,6 +118,8 @@ Supported Providers
 - VK (OAuth2)
 
 - Weibo (OAuth2)
+
+- Weixin (OAuth2)
 
 - Windows Live (OAuth2)
 

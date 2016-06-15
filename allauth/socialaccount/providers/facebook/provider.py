@@ -3,11 +3,11 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ImproperlyConfigured
 from django.middleware.csrf import get_token
-from django.template.loader import render_to_string
-from django.template import RequestContext
 from django.utils.html import mark_safe, escapejs
+from django.utils.http import urlquote
 from django.utils.crypto import get_random_string
 
+from allauth.compat import render_to_string
 from allauth.utils import import_callable
 from allauth.account.models import EmailAddress
 from allauth.socialaccount import providers
@@ -46,7 +46,6 @@ class FacebookAccount(ProviderAccount):
 class FacebookProvider(OAuth2Provider):
     id = 'facebook'
     name = 'Facebook'
-    package = 'allauth.socialaccount.providers.facebook'
     account_class = FacebookAccount
 
     def __init__(self):
@@ -64,8 +63,8 @@ class FacebookProvider(OAuth2Provider):
                 kwargs.get('process') or AuthProcess.LOGIN)
             action = "'%s'" % escapejs(
                 kwargs.get('action') or AuthAction.AUTHENTICATE)
-            ret = "javascript:allauth.facebook.login(%s, %s, %s)" \
-                % (next, action, process)
+            js = "allauth.facebook.login(%s, %s, %s)" % (next, action, process)
+            ret = "javascript:%s" % (urlquote(js),)
         else:
             assert method == 'oauth2'
             ret = super(FacebookProvider, self).get_login_url(request,
@@ -134,7 +133,9 @@ class FacebookProvider(OAuth2Provider):
                                        " add a SocialApp using the Django"
                                        " admin")
 
-        abs_uri = lambda name: request.build_absolute_uri(reverse(name))
+        def abs_uri(name):
+            return request.build_absolute_uri(reverse(name))
+
         fb_data = {
             "appId": app.client_id,
             "version": GRAPH_API_VERSION,
@@ -150,9 +151,8 @@ class FacebookProvider(OAuth2Provider):
             "csrfToken": get_token(request)
         }
         ctx = {'fb_data': mark_safe(json.dumps(fb_data))}
-        return render_to_string('facebook/fbconnect.html',
-                                ctx,
-                                RequestContext(request))
+        return render_to_string('facebook/fbconnect.html', ctx,
+                                request=request)
 
     def get_nonce(self, request, or_create=False, pop=False):
         if pop:

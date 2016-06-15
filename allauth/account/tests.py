@@ -3,6 +3,7 @@ import json
 
 from datetime import timedelta
 
+import django
 from django.utils.timezone import now
 from django.test.utils import override_settings
 from django.conf import settings
@@ -17,8 +18,15 @@ import unittest
 
 from allauth.tests import TestCase, patch
 from allauth.account.forms import BaseSignupForm
-from allauth.account.models import EmailAddress, EmailConfirmation
-from allauth.utils import get_user_model, get_current_site
+from allauth.account.models import (
+    EmailAddress,
+    EmailConfirmation,
+    EmailConfirmationHMAC)
+
+from allauth.utils import (
+    get_current_site,
+    get_user_model,
+    get_username_max_length)
 
 from . import app_settings
 
@@ -117,10 +125,14 @@ class AccountTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
         return get_user_model().objects.get(username=username)
 
-    def _create_user_and_login(self):
+    def _create_user(self):
         user = get_user_model().objects.create(username='john', is_active=True)
         user.set_password('doe')
         user.save()
+        return user
+
+    def _create_user_and_login(self):
+        user = self._create_user()
         self.client.login(username='john', password='doe')
         return user
 
@@ -130,6 +142,10 @@ class AccountTests(TestCase):
         resp = c.get(reverse('account_login'))
         self.assertRedirects(resp, 'http://testserver/accounts/profile/',
                              fetch_redirect_response=False)
+
+    def test_password_reset_get(self):
+        resp = self.client.get(reverse('account_reset_password'))
+        self.assertTemplateUsed(resp, 'account/password_reset.html')
 
     def test_password_set_redirect(self):
         resp = self._password_set_or_reset_redirect('account_set_password',
@@ -161,16 +177,16 @@ class AccountTests(TestCase):
         return resp
 
     def test_password_forgotten_username_hint(self):
-        self._request_new_password()
+        user = self._request_new_password()
         body = mail.outbox[0].body
-        assert 'username' in body
+        assert user.username in body
 
     @override_settings(
         ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.EMAIL)
     def test_password_forgotten_no_username_hint(self):
-        self._request_new_password()
+        user = self._request_new_password()
         body = mail.outbox[0].body
-        assert 'username' not in body
+        assert user.username not in body
 
     def _request_new_password(self):
         user = get_user_model().objects.create(
@@ -198,7 +214,10 @@ class AccountTests(TestCase):
         # Extract URL for `password_reset_from_key` view and access it
         url = body[body.find('/password/reset/'):].split()[0]
         resp = self.client.get(url)
-        self.assertTemplateUsed(resp, 'account/password_reset_from_key.html')
+        self.assertTemplateUsed(
+            resp,
+            'account/password_reset_from_key.%s' %
+            app_settings.TEMPLATE_EXTENSION)
         self.assertFalse('token_fail' in resp.context_data)
 
         # Reset the password
@@ -217,13 +236,18 @@ class AccountTests(TestCase):
         resp = self.client.post(url,
                                 {'password1': 'newpass123',
                                  'password2': 'newpass123'})
-        self.assertTemplateUsed(resp, 'account/password_reset_from_key.html')
+        self.assertTemplateUsed(
+            resp,
+            'account/password_reset_from_key.%s' %
+            app_settings.TEMPLATE_EXTENSION)
         self.assertTrue(resp.context_data['token_fail'])
 
         # Same should happen when accessing the page directly
         response = self.client.get(url)
-        self.assertTemplateUsed(response,
-                                'account/password_reset_from_key.html')
+        self.assertTemplateUsed(
+            response,
+            'account/password_reset_from_key.%s' %
+            app_settings.TEMPLATE_EXTENSION)
         self.assertTrue(response.context_data['token_fail'])
 
         # When in XHR views, it should respond with a 400 bad request
@@ -238,19 +262,20 @@ class AccountTests(TestCase):
         self.assertTrue('form_errors' in data)
         self.assertTrue('__all__' in data['form_errors'])
 
-
     @override_settings(ACCOUNT_LOGIN_ON_PASSWORD_RESET=True)
     def test_password_reset_ACCOUNT_LOGIN_ON_PASSWORD_RESET(self):
         user = self._request_new_password()
         body = mail.outbox[0].body
         url = body[body.find('/password/reset/'):].split()[0]
-        resp = self.client.post(url,
-                                {'password1': 'newpass123',
-                                 'password2': 'newpass123'})
+        resp = self.client.post(
+            url,
+            {'password1': 'newpass123',
+             'password2': 'newpass123'})
         self.assertTrue(user.is_authenticated())
         # EmailVerificationMethod.MANDATORY sends us to the confirm-email page
         self.assertRedirects(resp, '/confirm-email/')
 
+    @override_settings(ACCOUNT_EMAIL_CONFIRMATION_HMAC=False)
     def test_email_verification_mandatory(self):
         c = Client()
         # Signup
@@ -264,8 +289,9 @@ class AccountTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ['john@doe.com'])
         self.assertGreater(mail.outbox[0].body.find('https://'), 0)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertTemplateUsed(resp,
-                                'account/verification_sent.html')
+        self.assertTemplateUsed(
+            resp,
+            'account/verification_sent.%s' % app_settings.TEMPLATE_EXTENSION)
         # Attempt to login, unverified
         for attempt in [1, 2]:
             resp = c.post(reverse('account_login'),
@@ -278,8 +304,9 @@ class AccountTests(TestCase):
             self.assertTrue(get_user_model().objects.filter(
                 username='johndoe', is_active=True).exists())
 
-            self.assertTemplateUsed(resp,
-                                    'account/verification_sent.html')
+            self.assertTemplateUsed(
+                resp,
+                'account/verification_sent.' + app_settings.TEMPLATE_EXTENSION)
             # Attempt 1: no mail is sent due to cool-down ,
             # but there was already a mail in the outbox.
             self.assertEqual(len(mail.outbox), attempt)
@@ -288,8 +315,7 @@ class AccountTests(TestCase):
                     email_address__email='john@doe.com').count(),
                 attempt)
             # Wait for cooldown
-            EmailConfirmation.objects.update(sent=now()
-                                             - timedelta(days=1))
+            EmailConfirmation.objects.update(sent=now() - timedelta(days=1))
         # Verify, and re-attempt to login.
         confirmation = EmailConfirmation \
             .objects \
@@ -297,7 +323,9 @@ class AccountTests(TestCase):
             .get()
         resp = c.get(reverse('account_confirm_email',
                              args=[confirmation.key]))
-        self.assertTemplateUsed(resp, 'account/email_confirm.html')
+        self.assertTemplateUsed(
+            resp,
+            'account/email_confirm.%s' % app_settings.TEMPLATE_EXTENSION)
         c.post(reverse('account_confirm_email',
                        args=[confirmation.key]))
         resp = c.post(reverse('account_login'),
@@ -336,6 +364,36 @@ class AccountTests(TestCase):
         self.assertRedirects(resp,
                              'http://testserver'+settings.LOGIN_REDIRECT_URL,
                              fetch_redirect_response=False)
+
+    @override_settings(
+        ACCOUNT_EMAIL_VERIFICATION=app_settings.EmailVerificationMethod
+        .OPTIONAL,
+        ACCOUNT_LOGIN_ATTEMPTS_LIMIT=3)
+    def test_login_failed_attempts_exceeded(self):
+        user = get_user_model().objects.create(username='john')
+        user.set_password('doe')
+        user.save()
+        EmailAddress.objects.create(user=user,
+                                    email='john@example.com',
+                                    primary=True,
+                                    verified=False)
+        for i in range(5):
+            is_valid_attempt = (i == 4)
+            is_locked = (i >= 3)
+            resp = self.client.post(
+                reverse('account_login'),
+                {'login': 'john',
+                 'password': (
+                     'doe' if is_valid_attempt
+                     else 'wrong')})
+            self.assertFormError(
+                resp,
+                'form',
+                None,
+                'Too many failed login attempts. Try again later.'
+                if is_locked
+                else
+                'The username and/or password you specified are not correct.')
 
     def test_login_unverified_account_mandatory(self):
         """Tests login behavior when email verification is mandatory."""
@@ -432,7 +490,9 @@ class AccountTests(TestCase):
     @override_settings(ACCOUNT_LOGOUT_ON_GET=False)
     def test_logout_view_on_post(self):
         c, resp = self._logout_view('get')
-        self.assertTemplateUsed(resp, 'account/logout.html')
+        self.assertTemplateUsed(
+            resp,
+            'account/logout.%s' % app_settings.TEMPLATE_EXTENSION)
         resp = c.post(reverse('account_logout'))
         self.assertTemplateUsed(resp, 'account/messages/logged_out.txt')
 
@@ -484,6 +544,83 @@ class AccountTests(TestCase):
         self._create_user_and_login()
         resp = self.client.get(reverse('account_login'))
         self.assertEqual(resp.status_code, 200)
+
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[{
+        'NAME':
+        'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 9,
+            }
+        }])
+    def test_django_password_validation(self):
+        if django.VERSION < (1, 9, ):
+            return
+        resp = self.client.post(
+            reverse('account_signup'),
+            {'username': 'johndoe',
+             'email': 'john@doe.com',
+             'password1': 'johndoe',
+             'password2': 'johndoe'})
+        self.assertFormError(resp, 'form', None, [])
+        self.assertFormError(
+            resp,
+            'form',
+            'password1',
+            ['This password is too short.'
+             ' It must contain at least 9 characters.'])
+
+    @override_settings(ACCOUNT_EMAIL_CONFIRMATION_HMAC=True)
+    def test_email_confirmation_hmac_falls_back(self):
+        user = self._create_user()
+        email = EmailAddress.objects.create(
+            user=user,
+            email='a@b.com',
+            verified=False,
+            primary=True)
+        confirmation = EmailConfirmation.create(email)
+        confirmation.sent = now()
+        confirmation.save()
+        self.client.post(
+            reverse('account_confirm_email',
+                    args=[confirmation.key]))
+        email = EmailAddress.objects.get(pk=email.pk)
+        self.assertTrue(email.verified)
+
+    @override_settings(ACCOUNT_EMAIL_CONFIRMATION_HMAC=True)
+    def test_email_confirmation_hmac(self):
+        user = self._create_user()
+        email = EmailAddress.objects.create(
+            user=user,
+            email='a@b.com',
+            verified=False,
+            primary=True)
+        confirmation = EmailConfirmationHMAC(email)
+        confirmation.send()
+        self.assertEqual(len(mail.outbox), 1)
+        self.client.post(
+            reverse('account_confirm_email',
+                    args=[confirmation.key]))
+        email = EmailAddress.objects.get(pk=email.pk)
+        self.assertTrue(email.verified)
+
+    @override_settings(
+        ACCOUNT_EMAIL_CONFIRMATION_HMAC=True,
+        ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS=0)
+    def test_email_confirmation_hmac_timeout(self):
+        user = self._create_user()
+        email = EmailAddress.objects.create(
+            user=user,
+            email='a@b.com',
+            verified=False,
+            primary=True)
+        confirmation = EmailConfirmationHMAC(email)
+        confirmation.send()
+        self.assertEqual(len(mail.outbox), 1)
+        self.client.post(
+            reverse('account_confirm_email',
+                    args=[confirmation.key]))
+        email = EmailAddress.objects.get(pk=email.pk)
+        self.assertFalse(email.verified)
 
 
 class EmailFormTests(TestCase):
@@ -636,6 +773,19 @@ class BaseSignupFormTests(TestCase):
         }
         form = BaseSignupForm(data, email_required=True)
         self.assertTrue(form.is_valid())
+
+    @override_settings(ACCOUNT_USERNAME_REQUIRED=True)
+    def test_username_maxlength(self):
+        data = {
+            'username': 'username',
+            'email': 'user@example.com',
+        }
+        form = BaseSignupForm(data, email_required=True)
+        max_length = get_username_max_length()
+        field = form.fields['username']
+        self.assertEqual(field.max_length, max_length)
+        widget = field.widget
+        self.assertEqual(widget.attrs.get('maxlength'), str(max_length))
 
 
 class AuthenticationBackendTests(TestCase):
